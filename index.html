@@ -417,7 +417,7 @@
 					requestAnimationFrame(App.tick);
 					
 					setInterval(() => {
-						history.replaceState({}, '', `${location.pathname}?seed=${App.seed}&x=${App.Camera.floorX}&y=${App.Camera.floorY}`)
+						parent.history.replaceState({}, '', `${location.pathname}?seed=${App.seed}&x=${App.Camera.floorX}&y=${App.Camera.floorY}`)
 					}, 1000);
 				}
 			}
