@@ -257,8 +257,8 @@
 							len = Math.min(1, len / 0.4 - 1);
 							dx *= len;
 							dy *= len;
-							Camera.x += dx * Camera.speed * App.deltaTime;
-							Camera.y += dy * Camera.speed * App.deltaTime;
+							Camera.x += dx * Camera.speed * 100 * App.deltaTime;
+							Camera.y += dy * Camera.speed * 100 * App.deltaTime;
 						}
 					}
 
@@ -404,7 +404,7 @@
 				}
 
 				static tick(timestamp) {
-					App.deltaTime = Math.min(1, 1000 / (timestamp - App.lastFrameTimeMs));
+					App.deltaTime = Math.min(1, (timestamp - App.lastFrameTimeMs) / 1000);
 					App.lastFrameTimeMs = timestamp;
 
 					App.draw();
