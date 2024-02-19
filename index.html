@@ -100,8 +100,8 @@
 						let [randomArray, steps] = [new Array(area).fill(0), 0];
 						for (let w = width, h = height; w > 1 && h > 1; w = Math.floor(w / 2), h = Math.floor(h / 2)) {
 							const stepRandomArray = PerlinNoise.#interpolateArray2d(PerlinNoise.#generateRandomArray(seed * (steps + 1), w * h), w, h, width, height);
-							for (let j = 0; j < area; ++j) {
-								randomArray[j] += stepRandomArray[j];
+							for (let i = 0; i < area; ++i) {
+								randomArray[i] += stepRandomArray[i];
 							}
 							++steps;
 						}
