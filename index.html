@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<title>Infinite-2D-Chunk-World</title>
+		<style>
+			html, body {
+				height: 100%;
+			}
+
+			body {
+				margin: 0;
+			}
+
+			#canvas {
+				position: fixed;
+				left: 0px;
+				top: 0px;
+				width: 100%;
+				height: 100%;
+			}
+		</style>
+	</head>
+	<body>
+		<canvas id="canvas"></canvas>
+		<script>
+			class App {
+				static PerlinNoise = class PerlinNoise {
+					static * #xorshift32(seed) {
+						let state = seed;
+
+						while (true) {
+							state ^= state << 13;
+							state ^= state >>> 17;
+							state ^= state << 5;
+							yield state / 2 ** 32 + 0.5;
+						}
+					}
+
+					static #generateRandomArray(seed, size) {
+						const [arr, randomGenerator] = [new Array(size), PerlinNoise.#xorshift32(seed)];
+						for (let i = 0; i < size; ++i) {
+							arr[i] = randomGenerator.next().value;
+						}
+						return arr;
+					}
+
+					static #interpolateArray2d(arr, width, height, newWidth, newHeight) {
+						const newArr = new Array(newWidth * newHeight);
+						const [xs, ys] = [width / newWidth, height / newHeight];
+
+						for (let x = 0; x < newWidth; ++x) {
+							for (let y = 0; y < newHeight; ++y) {
+								let sx = (x + 0.5) * xs - 0.5;
+								if (sx < 0) {
+									sx = 0;
+								}
+
+								let sy = (y + 0.5) * ys - 0.5;
+								if (sy < 0) {
+									sy = 0;
+								}
+
+								const [x0, y0] = [Math.floor(sx), Math.floor(sy)];
+								const [fracx, fracy] = [sx - x0, sy - y0];
+								const [ifracx, ifracy] = [1 - fracx, 1 - fracy];
+
+								let x1 = x0 + 1;
+								if (x1 >= width) {
+									x1 = x0;
+								}
+
+								let y1 = y0 + 1;
+								if (y1 >= height) {
+									y1 = y0;
+								}
+
+								const [c1, c2, c3, c4] = [
+									arr[x0 + y0 * width],
+									arr[x1 + y0 * width],
+									arr[x0 + y1 * width],
+									arr[x1 + y1 * width]
+								];
+
+								const [l0, l1] = [
+									ifracx * c1 + fracx * c2,
+									ifracx * c3 + fracx * c4
+								];
+								const rf = ifracy * l0 + fracy * l1;
+
+								newArr[x + y * newWidth] = rf;
+							}
+						}
+
+						return newArr;
+					}
+
+					static #get(seed, width, height) {
+						const area = width * height;
+						let [randomArray, steps] = [new Array(area).fill(0), 0];
+						for (let w = width, h = height; w > 1 && h > 1; w = Math.floor(w / 2), h = Math.floor(h / 2)) {
+							const stepRandomArray = PerlinNoise.#interpolateArray2d(PerlinNoise.#generateRandomArray(seed * (steps + 1), w * h), w, h, width, height);
+							for (let j = 0; j < area; ++j) {
+								randomArray[j] += stepRandomArray[j];
+							}
+							++steps;
+						}
+						for (let i = 0; i < area; ++i) {
+							randomArray[i] /= steps;
+						}
+						return randomArray;
+					}
+
+					static * get(seed, width, height) {
+						const [w, h] = [Math.floor(width / 2), Math.floor(height / 2)];
+						let randomArray = PerlinNoise.#get(seed, w, h);
+						randomArray = PerlinNoise.#interpolateArray2d(randomArray, w, h, width, height);
+						for (const r of randomArray) {
+							yield r;
+						}
+					}
+				};
+
+				static searchParams = new URLSearchParams(location.search);
+				static seed = parseInt(App.searchParams.get('seed')) || Math.floor(Math.random() * 2 ** 32);
+
+				static KeyboardCPS = class KeyboardCPS {
+					static #perKey = {};
+
+					static {
+						window.addEventListener('keyup', evt => {
+							KeyboardCPS.#perKey[evt.keyCode] = (KeyboardCPS.#perKey[evt.keyCode] || 0) + 1;
+							setTimeout(() => {
+								--KeyboardCPS.#perKey[evt.keyCode];
+							}, 1000);
+						});
+					}
+
+					static get(keyCode) {
+						return KeyboardCPS.#perKey[keyCode] || 0;
+					}
+				};
+
+				static CanvasExtensions = class CanvasExtensions {
+					static {
+						CanvasRenderingContext2D.prototype.drawText = function(...args) {
+							this.fillText(...args);
+							this.strokeText(...args);
+						};
+					}
+				};
+
+				static ctx = canvas.getContext('2d');
+
+				static Canvas = class Canvas {
+					static #width = 0;
+					static #halfWidth = 0;
+					static #height = 0;
+					static #halfHeight = 0;
+					static #shorterSide = 0;
+					static #halfShorterSide = 0;
+
+					static #resize() {
+						const [width, height] = [window.innerWidth, window.innerHeight];
+						const shorterSide = Math.min(width, height);
+						canvas.width = width;
+						canvas.height = height;
+						Canvas.#width = width;
+						Canvas.#halfWidth = width / 2;
+						Canvas.#height = height;
+						Canvas.#halfHeight = height / 2;
+						Canvas.#shorterSide = shorterSide;
+						Canvas.#halfShorterSide = shorterSide / 2;
+					}
+
+					static {
+						for (const type of ['resize', 'orientationchange']) {
+							window.addEventListener(type, Canvas.#resize);
+						}
+						Canvas.#resize();
+					}
+
+					static get width() {
+						return Canvas.#width;
+					}
+
+					static get halfWidth() {
+						return Canvas.#halfWidth;
+					}
+
+					static get height() {
+						return Canvas.#height;
+					}
+
+					static get halfHeight() {
+						return Canvas.#halfHeight;
+					}
+
+					static get shorterSide() {
+						return Canvas.#shorterSide;
+					}
+
+					static get halfShorterSide() {
+						return Canvas.#halfShorterSide;
+					}
+				};
+
+				static Mouse = class Mouse {
+					static #x = App.Canvas.halfWidth;
+					static #y = App.Canvas.halfHeight;
+
+					static {
+						canvas.addEventListener('mousemove', evt => {
+							Mouse.#x = evt.clientX;
+							Mouse.#y = evt.clientY;
+						});
+					}
+
+					static get x() {
+						return Mouse.#x - App.Canvas.halfWidth;
+					}
+
+					static get y() {
+						return Mouse.#y - App.Canvas.halfHeight;
+					}
+				};
+
+				static Camera = class Camera {
+					static x = parseInt(App.searchParams.get('x')) || 0;
+					static y = parseInt(App.searchParams.get('y')) || 0;
+					static speed = 5;
+
+					static {
+						window.addEventListener('keydown', evt => {
+							switch (evt.keyCode) {
+								case 81: // Q
+									Camera.speed += Math.max(1, Math.floor(Camera.speed / 20 * (App.KeyboardCPS.get(evt.keyCode) - 1)));
+									break;
+								case 87: // W
+									Camera.speed = Math.max(1, Camera.speed - Math.max(1, Math.floor(Camera.speed / 20 * (App.KeyboardCPS.get(evt.keyCode) - 1))));
+									break;
+								case 82: // R
+									Camera.x = 0;
+									Camera.y = 0;
+									break;
+							}
+						});
+					}
+
+					static update() {
+						let dx = App.Mouse.x / App.Canvas.halfShorterSide,
+							dy = App.Mouse.y / App.Canvas.halfShorterSide,
+							len = Math.hypot(dx, dy);
+						if (len > 0.4) {
+							dx /= len;
+							dy /= len;
+							len = Math.min(1, len / 0.4 - 1);
+							dx *= len;
+							dy *= len;
+							Camera.x += dx * Camera.speed * App.deltaTime;
+							Camera.y += dy * Camera.speed * App.deltaTime;
+						}
+					}
+
+					static get floorX() {
+						return Math.floor(Camera.x);
+					}
+
+					static get floorY() {
+						return Math.floor(Camera.y);
+					}
+				};
+
+				static Chunks = class Chunks {
+					static cellSize = 16;
+					static #chunkSize = 2048;
+
+					static #cache = {};
+					static #worker = new Worker(URL.createObjectURL(new Blob([`
+						${App.PerlinNoise};
+						const [cellSize, chunkSize, seed] = [${Chunks.cellSize}, ${Chunks.#chunkSize}, ${App.seed}];
+					(` + (function() {
+						addEventListener('message', evt => {
+							const [chunkX, chunkY] = evt.data;
+							const [cellXEnd, cellYEnd] = [chunkX + chunkSize, chunkY + chunkSize];
+							const [width, height] = [
+								Math.ceil(Math.abs(cellXEnd - chunkX)) / cellSize,
+								Math.ceil(Math.abs(cellYEnd - chunkY)) / cellSize
+							];
+							const cells = new Array(width * height);
+							const rand = PerlinNoise.get((seed + chunkX + chunkY * 2 ** 16) % 2 ** 32, width, height);
+							for (let cellX = chunkX, cellI = 0; cellX < cellXEnd; cellX += cellSize) {
+								for (let cellY = chunkY; cellY < cellYEnd; cellY += cellSize) {
+									cells[cellI] = [cellX, cellY, rand.next()];
+									++cellI;
+								}
+							}
+							postMessage([chunkX, chunkY, cells]);
+						});
+					}).toString() + `)();`])));
+					static #postedMessages = 0;
+
+					static {
+						Chunks.#worker.addEventListener('message', evt => {
+							const [chunkX, chunkY, cells] = evt.data;
+							const key = `${chunkX}/${chunkY}`;
+							Chunks.#cache[key] = [cells, setTimeout(() => {
+								delete Chunks.#cache[key];
+							}, 1000)];
+							--Chunks.#postedMessages;
+						});
+					}
+
+					static get() {
+						const [xBegin, xEnd, yBegin, yEnd] = [
+							-Math.floor(App.Canvas.halfWidth / Chunks.#chunkSize) * Chunks.#chunkSize - Chunks.#chunkSize,
+							Math.floor(App.Canvas.halfWidth / Chunks.#chunkSize) * Chunks.#chunkSize + Chunks.#chunkSize,
+							-Math.floor(App.Canvas.halfHeight / Chunks.#chunkSize) * Chunks.#chunkSize - Chunks.#chunkSize,
+							Math.floor(App.Canvas.halfHeight / Chunks.#chunkSize) * Chunks.#chunkSize + Chunks.#chunkSize
+						]
+						const chunks = [];
+						for (let x = xBegin; x <= xEnd; x += Chunks.#chunkSize) {
+							for (let y = yBegin; y <= yEnd; y += Chunks.#chunkSize) {
+								const [chunkX, chunkY] = [
+									Math.floor((App.Camera.x + x) / Chunks.#chunkSize) * Chunks.#chunkSize,
+									Math.floor((App.Camera.y + y) / Chunks.#chunkSize) * Chunks.#chunkSize
+								];
+								const key = `${chunkX}/${chunkY}`, cache = Chunks.#cache[key];
+								if (cache) {
+									if (cache.length > 0) {
+										const [cells, timeout] = cache;
+										clearTimeout(timeout);
+										Chunks.#cache[key] = [cells, setTimeout(() => {
+											delete Chunks.#cache[key];
+										}, 1000)];
+										chunks.push(cells);
+									}
+								} else if (Chunks.#postedMessages < 10) {
+									Chunks.#cache[key] = [];
+									Chunks.#worker.postMessage([chunkX, chunkY]);
+									++Chunks.#postedMessages;
+								}
+							}
+						}
+						return chunks;
+					}
+				};
+
+				static lastFrameTimeMs = 0;
+				static deltaTime = 0;
+
+				static draw() {
+					App.ctx.save();
+					App.ctx.fillStyle = 'black';
+					App.ctx.fillRect(0, 0, App.Canvas.width, App.Canvas.height);
+
+					App.ctx.translate(Math.floor(-App.Camera.x + App.Canvas.halfWidth), Math.floor(-App.Camera.y + App.Canvas.halfHeight));
+					App.ctx.fillStyle = 'white';
+					App.ctx.fillRect(0, 0, 10, 10);
+
+					for (const chunk of App.Chunks.get()) {
+						for (const cell of chunk) {
+							const [cellX, cellY] = cell;
+							if (
+								cellX < App.Camera.x - App.Canvas.halfWidth - App.Chunks.cellSize ||
+								cellX > App.Camera.x + App.Canvas.halfWidth ||
+								cellY < App.Camera.y - App.Canvas.halfHeight - App.Chunks.cellSize ||
+								cellY > App.Camera.y + App.Canvas.halfHeight 
+							) {
+								continue;
+							}
+							const cellRandom = cell[2].value;
+							switch (true) {
+							case cellRandom < 0.3:
+								App.ctx.fillStyle = 'blue';
+								break;
+							case cellRandom < 0.4:
+								App.ctx.fillStyle = 'orange';
+								break;
+							case cellRandom < 0.6:
+								App.ctx.fillStyle = 'darkgreen';
+								break;
+							case cellRandom < 1:
+								App.ctx.fillStyle = 'green';
+								break;
+							}
+							App.ctx.fillRect(cellX, cellY, App.Chunks.cellSize, App.Chunks.cellSize);
+						}
+					}
+
+					App.ctx.restore();
+
+					App.ctx.fillStyle = 'white';
+					App.ctx.textBaseline = 'top';
+					App.ctx.textAlign = 'left';
+					App.ctx.font = 'bold 20px verdana';
+					App.ctx.drawText(`Speed/X/Y: ${App.Camera.speed} ${App.Camera.floorX} ${App.Camera.floorY}`, 10, 10);
+					App.ctx.drawText('Increase/decrease speed: Q/W', 10, 40);
+					App.ctx.drawText('Reset position: R', 10, 70);
+				}
+
+				static update() {
+					App.Camera.update();
+				}
+
+				static tick(timestamp) {
+					App.deltaTime = Math.min(1, 1000 / (timestamp - App.lastFrameTimeMs));
+					App.lastFrameTimeMs = timestamp;
+
+					App.draw();
+					App.update();
+
+					requestAnimationFrame(App.tick);
+				}
+
+				static {
+					requestAnimationFrame(App.tick);
+					
+					setInterval(() => {
+						history.replaceState({}, '', `${location.pathname}?seed=${App.seed}&x=${App.Camera.floorX}&y=${App.Camera.floorY}`)
+					}, 1000);
+				}
+			}
+		</script>
+	</body>
+</html>
