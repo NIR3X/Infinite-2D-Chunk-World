@@ -3,6 +3,7 @@
 	<head>
 		<meta charset="utf-8">
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<title>Infinite-2D-Chunk-World</title>
 		<style>
 			/* Remove focus outline on key press */
@@ -199,6 +200,11 @@
 						Canvas.#halfHeight = height / 2;
 						Canvas.#shorterSide = shorterSide;
 						Canvas.#halfShorterSide = shorterSide / 2;
+						if (width < height) {
+							if (document.exitFullscreen) {
+								document.exitFullscreen();
+							}
+						}
 					}
 
 					static {
@@ -206,6 +212,12 @@
 							window.addEventListener(type, Canvas.#resize);
 						}
 						Canvas.#resize();
+
+						window.addEventListener('touchstart', function() {
+							if (!document.fullscreenElement) {
+								container.requestFullscreen();
+							}
+						});
 					}
 
 					static get width() {
