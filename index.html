@@ -420,7 +420,7 @@
 						App.searchParams.set('seed', App.seed);
 						App.searchParams.set('x', App.Camera.floorX);
 						App.searchParams.set('y', App.Camera.floorY);
-						history.replaceState({}, '', `${location.origin}${location.pathname}?${App.searchParams.toString()}`);
+						history.replaceState({}, '', `${location.origin}${location.pathname}?${decodeURIComponent(App.searchParams.toString())}`);
 					}, 1000);
 				}
 			}
