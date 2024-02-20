@@ -134,7 +134,7 @@
 				};
 
 				static searchParams = new URLSearchParams(location.search);
-				static seed = App.searchParams.get('seed')?.split(',').map(_ => parseInt(_)) || new Array(4).fill(0).map(_ => Math.floor(Math.random() * 4294967296));
+				static seed = App.searchParams.get('seed')?.split(',').map(_ => parseInt(_)) || Array.from(crypto.getRandomValues(new Uint32Array(4)));
 
 				static KeyboardCPS = class KeyboardCPS {
 					static #perKey = {};
