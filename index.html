@@ -417,7 +417,10 @@
 					requestAnimationFrame(App.tick);
 					
 					setInterval(() => {
-						history.replaceState({}, '', `${location.pathname}?seed=${App.seed}&x=${App.Camera.floorX}&y=${App.Camera.floorY}`);
+						App.searchParams.set('seed', App.seed);
+						App.searchParams.set('x', App.Camera.floorX);
+						App.searchParams.set('y', App.Camera.floorY);
+						history.replaceState({}, '', `${location.origin}${location.pathname}?${App.searchParam.toString()}`);
 					}, 1000);
 				}
 			}
